@@ -1,0 +1,8 @@
+/Manifest.toml
+.vscode/settings.json
+test/Manifest.toml
+
+neighborhood_smoothing_pps_estimation.jl
+neighborhood_smoothing_trials_hpc.jl
+neighborhood_smoothing_trials.jl
+neighborhood_smoothing_gpt_knn_version.jl
