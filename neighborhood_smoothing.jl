@@ -64,7 +64,9 @@ end
 
 
 ### column-major ordered version (which for large matrices is substantially faster in Julia)
-function NeighborhoodSmoothing(A::Union{SparseMatrixCSC, Matrix}; directed::Bool = false, direction::Symbol = :columnwise)
+function NeighborhoodSmoothing(A::Union{SparseMatrixCSC, Matrix}; 
+                                directed::Bool = false, 
+                                direction::Symbol = :columnwise)
 
     # INPUT:
     # A: adjacency matrix (NxN)
@@ -84,7 +86,7 @@ function NeighborhoodSmoothing(A::Union{SparseMatrixCSC, Matrix}; directed::Bool
     h = sqrt(log(N) / N)
 
     # Compute dissimilarity measures
-    D = zeros(N, N)     # sparse matrix writing is not threadsafe
+    D = zeros(Float64, N, N)     # sparse matrix writing is not threadsafe
 
     if directed
         A_sq = A' * A / N
