@@ -120,7 +120,7 @@ function NeighborhoodSmoothing(A::Union{SparseMatrixCSC, Matrix};
     if direction == :columnwise
         return W_hat
     else
-        return Matrix(W_hat')
+        return Matrix(transpose(W_hat))
     end
 end
 
