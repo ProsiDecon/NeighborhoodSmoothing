@@ -6,4 +6,4 @@ neighborhood_smoothing_pps_estimation.jl
 neighborhood_smoothing_trials_hpc.jl
 neighborhood_smoothing_trials.jl
 neighborhood_smoothing_gpt_knn_version.jl
-neighborhood_smoothing_oldver.jl
+neighborhood_smoothing_old_ver.jl
