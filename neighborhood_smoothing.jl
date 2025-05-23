@@ -1,6 +1,5 @@
 using Statistics
 using SparseArrays
-#using NearestNeighbors
 
 """
 #     Computes the neighborhood smoothing algorithm described in 
