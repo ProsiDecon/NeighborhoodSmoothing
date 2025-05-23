@@ -23,9 +23,9 @@ function NeighborhoodSmoothing(A::Union{SparseMatrixCSC, Matrix};
     # "forward steps" on the matrix (in the sense of finding the neighbors via one forward and one backward step)
     # are steps along the row of the matrix (row-elements are outflows from node)
 
-    if direction == :rowwise    # for row-wise comparisons, run operations on the transpose and then transpose output at the end
+    if directed && direction == :rowwise    # for row-wise comparisons, run operations on the transpose and then transpose output at the end
         A = copy(transpose(A))
-    elseif direction != :columnwise
+    elseif directed && direction != :columnwise
         throw("direction must be :rowwise or :columnwise")
     end
 
@@ -38,6 +38,9 @@ function NeighborhoodSmoothing(A::Union{SparseMatrixCSC, Matrix};
     if directed
         A_sq = A' * A / N
     else
+        if A != A'
+            throw("Input Matrix not symmetric. For directed graphs choose option directed and specify direction of comparison.")
+        end
         A_sq = A * A / N
     end
 
@@ -60,15 +63,12 @@ function NeighborhoodSmoothing(A::Union{SparseMatrixCSC, Matrix};
     Kernel_mat = Kernel_mat ./ col_sums
 
     W_hat = A * Kernel_mat
-    if !directed
-        W_hat = (W_hat + W_hat') / 2
-    end
 
-    if direction == :columnwise
+    if !directed
+        return (W_hat + W_hat') / 2
+    elseif direction == :columnwise
         return W_hat
     else
         return Matrix(transpose(W_hat))
     end
 end
-
-
