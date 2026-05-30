@@ -16,7 +16,7 @@
     returndist::Bool                        = whather to return the estimate of the bilateral distance matrix d(i,j)    (note distance is symmetric by def)
 #     """
 
-function neighborhood_smoothing(A::Union{SparseMatrixCSC, Matrix}; 
+function neighborhood_smoothing(A::AbstractMatrix; 
                                 directed::Bool = false, 
                                 direction::Symbol = :columnwise,
                                 returndist::Bool = false)       #whether to return the (symmetric) raw estimate of the bilateral distance matrix 
