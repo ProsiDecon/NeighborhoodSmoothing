@@ -9,22 +9,29 @@ using SparseArrays
 #     Codes are translated from Matlab: https://github.com/yzhanghf/NeighborhoodSmoothing/blob/main/NeighborhoodSmoothing.m
 #     First for-loop was changed to allow for asymmetric networks
 #     This version takes advantage of column-major ordering (which for large matrices is substantially faster in Julia)
+
+    Inputs: A = the adjacency matrix ,
+    optional arguments
+    directed::Bool                          = whether A represents a directed graph 
+    direction ∈ [:rowwise, :columnwise]     = :columnwise (:rowwise) builds similarity based on column (row)-slices of the network 
+    returndist::Bool                        = whather to return the estimate of the bilateral distance matrix d(i,j)    (note distance is symmetric by def)
 #     """
 
 function NeighborhoodSmoothing(A::Union{SparseMatrixCSC, Matrix}; 
                                 directed::Bool = false, 
-                                direction::Symbol = :columnwise)
-    # INPUT:
-    # A: adjacency matrix (NxN)
-    # OUTPUT:
-    # W_hat: estimated probability matrix
-    # Note for directed graphs that the transposition-order of the input matrix matters. 
-    # "forward steps" on the matrix (in the sense of finding the neighbors via one forward and one backward step)
-    # are steps along the row of the matrix (row-elements are outflows from node)
-
+                                direction::Symbol = :columnwise,
+                                returndist::Bool = false)       #whether to return the (symmetric) raw estimate of the bilateral distance matrix 
+    """ INPUT:
+    A: adjacency matrix (NxN)
+    OUTPUT:
+    W_hat: estimated probability matrix
+    Note for directed graphs that the transposition-order of the input matrix matters. 
+    "forward steps" on the matrix (in the sense of finding the neighbors via one forward and one backward step)
+    are steps along the row of the matrix (row-elements are outflows from node)
+    """
     if directed && direction == :rowwise    # for row-wise comparisons, run operations on the transpose and then transpose output at the end
         A = copy(transpose(A))
-    elseif directed && direction != :columnwise
+    elseif directed && direction ∉ [:rowwise, :columnwise]
         throw("direction must be :rowwise or :columnwise")
     end
 
@@ -55,6 +62,7 @@ function NeighborhoodSmoothing(A::Union{SparseMatrixCSC, Matrix};
     for i in 1:N
         threshold = quantile(D[:, i], h)
         Kernel_mat[:, i] .= D[:, i] .< threshold
+        Kernel_mat[i,i] = 0         # make sure i does not enter its own neighborhood when estimating links
     end
 
     # Normalize each row under L1 norm
@@ -63,11 +71,21 @@ function NeighborhoodSmoothing(A::Union{SparseMatrixCSC, Matrix};
 
     W_hat = A * Kernel_mat
 
-    if !directed
-        return (W_hat + W_hat') / 2
-    elseif direction == :columnwise
-        return W_hat
+    if !returndist
+        if !directed
+            return (W_hat + W_hat') / 2
+        elseif direction == :columnwise
+            return W_hat
+        else
+            return Matrix(transpose(W_hat))
+        end
     else
-        return Matrix(transpose(W_hat))
+        if !directed
+            return (W_hat + W_hat') / 2, D
+        elseif direction == :columnwise
+            return W_hat, D
+        else
+            return Matrix(transpose(W_hat)), D
+        end
     end
 end
