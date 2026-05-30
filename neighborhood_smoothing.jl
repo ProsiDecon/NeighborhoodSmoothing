@@ -1,5 +1,4 @@
-using Statistics
-using SparseArrays
+
 
 """
 #     Computes the neighborhood smoothing algorithm described in 
@@ -17,7 +16,7 @@ using SparseArrays
     returndist::Bool                        = whather to return the estimate of the bilateral distance matrix d(i,j)    (note distance is symmetric by def)
 #     """
 
-function NeighborhoodSmoothing(A::Union{SparseMatrixCSC, Matrix}; 
+function neighborhood_smoothing(A::Union{SparseMatrixCSC, Matrix}; 
                                 directed::Bool = false, 
                                 direction::Symbol = :columnwise,
                                 returndist::Bool = false)       #whether to return the (symmetric) raw estimate of the bilateral distance matrix 
