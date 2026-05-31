@@ -27,7 +27,7 @@ end
 """
 function lowrank_gram!(M::AbstractMatrix, V::AbstractMatrix, weights::AbstractVector, normalizer::Real; add::Bool=false)
     weighted_V = similar(M, size(V, 1), length(weights)) 
-    weighted_V .= V * Diagonal(weights ./ normalizer)
+    weighted_V .= V .* reshape(weights, 1, :) ./ normalizer
     mul!(M, weighted_V, V', one(eltype(M)), add ? one(eltype(M)) : zero(eltype(M)))
     return M
 end
@@ -50,8 +50,9 @@ function spectral_truncation!(M::Matrix, A::Matrix, k::Int)
         return M
     else
         evals, evecs = eigs(A, nev = k, which = :LM)
-        M .= evecs * Diagonal(evals.^2) * evecs'
-        M ./= N
+        lowrank_gram!(M, evecs, evals.^2, N)
+        #M .= evecs * Diagonal(evals.^2) * evecs'
+        #M ./= N
         return M
     end
 end
@@ -74,8 +75,9 @@ function spectral_truncation!(M::Matrix, A::Adjoint, k::Int)
         return M
     else
         evals, evecs = eigs(A, nev = k, which = :LM)
-        M .= evecs * Diagonal(evals.^2) * evecs'
-        M ./= N
+        lowrank_gram!(M, evecs, evals.^2, N)
+        #M .= evecs * Diagonal(evals.^2) * evecs'
+        #M ./= N
         return M
     end
 end
@@ -93,8 +95,9 @@ function spectral_truncation!(M::Matrix, A::SparseMatrixCSC, k::Int)
         error("For spectral truncation, specify truncation dimension k < N, the matrix dimension.")
     else
         evals, evecs = eigs(A, nev = k, which = :LM)
-        M .= evecs * Diagonal(evals.^2) * evecs'
-        M ./= N
+        lowrank_gram!(M, evecs, evals.^2, N)
+        #M .= evecs * Diagonal(evals.^2) * evecs'
+        #M ./= N
         return M
     end
 end
@@ -110,14 +113,15 @@ function singular_truncation!(M::Matrix, A::Matrix, k::Int)
     if k == N
         error("For singular truncation, specify truncation dimension k < N, the matrix dimension.")
     elseif k >= .1*N 
-        U, S, _ = svd(A)
+        _, S, V = svd(A)
         idx = sortperm(S; by = abs, rev=true)[1:k]
-        lowrank_gram!(M, view(U, :, idx), S[idx].^2, N)
+        lowrank_gram!(M, view(V, :, idx), S[idx].^2, N)
         return M
     else
         singulars = svds(A, nsv = k)[1]
-        M .= singulars.U * Diagonal(singulars.S.^2) * singulars.U'
-        M ./= N
+        lowrank_gram!(M, singulars.Vt', singulars.S.^2, N)
+        #M .= singulars.U * Diagonal(singulars.S.^2) * singulars.U'
+        #M ./= N
         return M
     end
 end
@@ -133,14 +137,15 @@ function singular_truncation!(M::Matrix, A::Adjoint, k::Int)
     if k == N
         error("For singular truncation, specify truncation dimension k < N, the matrix dimension.")
     elseif k >= .1*N 
-        U, S, _ = svd(A)
+        _, S, V = svd(A)
         idx = sortperm(S; by = abs, rev=true)[1:k]
-        lowrank_gram!(M, view(U, :, idx), S[idx].^2, N)
+        lowrank_gram!(M, view(V, :, idx), S[idx].^2, N)
         return M
     else
         singulars = svds(A, nsv = k)[1]
-        M .= singulars.U * Diagonal(singulars.S.^2) * singulars.U'
-        M ./= N
+        lowrank_gram!(M, singulars.Vt', singulars.S.^2, N)
+        #M .= singulars.U * Diagonal(singulars.S.^2) * singulars.U'
+        #M ./= N
         return M
     end
 end
@@ -157,8 +162,9 @@ function singular_truncation!(M::Matrix, A::SparseMatrixCSC, k::Int)
         error("For singular truncation, specify truncation dimension k < N, the matrix dimension.")
     else
         singulars = svds(A, nsv = k)[1]
-        M .= singulars.U * Diagonal(singulars.S.^2) * singulars.U'
-        M ./= N
+        lowrank_gram!(M, singulars.Vt', singulars.S.^2, N)
+        #M .= singulars.U * Diagonal(singulars.S.^2) * singulars.U'
+        #M ./= N
         return M
     end
 end
@@ -181,8 +187,10 @@ function singular_truncation_both!(M::Matrix, A::Matrix, k::Int)
         return M
     else
         singulars = svds(A, nsv = k)[1]
-        M .= singulars.U * Diagonal(singulars.S.^2) * singulars.U' + singulars.Vt' * Diagonal(singulars.S.^2) * singulars.Vt
-        M ./= 2*N
+        lowrank_gram!(M, singulars.U, singulars.S.^2, 2*N)
+        lowrank_gram!(M, singulars.Vt', singulars.S.^2, 2*N, add = true)
+        #M .= singulars.U * Diagonal(singulars.S.^2) * singulars.U' + singulars.Vt' * Diagonal(singulars.S.^2) * singulars.Vt
+        #M ./= 2*N
         return M
     end
 end
@@ -206,8 +214,10 @@ function singular_truncation_both!(M::Matrix, A::Adjoint, k::Int)
         return M
     else
         singulars = svds(A, nsv = k)[1]
-        M .= singulars.U * Diagonal(singulars.S.^2) * singulars.U' + singulars.Vt' * Diagonal(singulars.S.^2) * singulars.Vt
-        M ./= 2*N
+        lowrank_gram!(M, singulars.U, singulars.S.^2, 2*N)
+        lowrank_gram!(M, singulars.Vt', singulars.S.^2, 2*N, add = true)
+        #M .= singulars.U * Diagonal(singulars.S.^2) * singulars.U' + singulars.Vt' * Diagonal(singulars.S.^2) * singulars.Vt
+        #M ./= 2*N
         return M
     end
 end
@@ -224,8 +234,10 @@ function singular_truncation_both!(M::Matrix, A::SparseMatrixCSC, k::Int)
         error("For singular truncation, specify truncation dimension k < N, the matrix dimension.")
     else
         singulars = svds(A, nsv = k)[1]
-        M .= singulars.U * Diagonal(singulars.S.^2) * singulars.U' + singulars.Vt' * Diagonal(singulars.S.^2) * singulars.Vt
-        M ./= 2*N
+        lowrank_gram!(M, singulars.U, singulars.S.^2, 2*N)
+        lowrank_gram!(M, singulars.Vt', singulars.S.^2, 2*N, add = true)
+        #M .= singulars.U * Diagonal(singulars.S.^2) * singulars.U' + singulars.Vt' * Diagonal(singulars.S.^2) * singulars.Vt
+        #M ./= 2*N
         return M
     end
 end
@@ -280,7 +292,7 @@ function fit!(kernel::PSDKernel)
     if kernel.type == :adjacency                    # computes the Gram matrix on the neighborhood directly
         nothing
     elseif kernel.type == :neighborhood_smoothing   # computes the Gram matrix on Zhang, Levina, and Zhu's graphon estimate
-        kernel.direction == :both || @warn "Neighborhood smoothing for both directions not implemented. Graphon will be estimated column-wise."
+        kernel.direction == :both && @warn "Neighborhood smoothing for both directions not implemented. Graphon will be estimated column-wise."
         smoothing_direction = ifelse(kernel.direction == :both, :columnwise, kernel.direction)
         kernel.A = neighborhood_smoothing(kernel.A; directed = kernel.directed, direction = smoothing_direction, returndist = false)
     elseif kernel.type == :laplacian                   # computes the Gram matrix on the unnormalized graph Laplacian
@@ -288,7 +300,7 @@ function fit!(kernel::PSDKernel)
         kernel.A .*= -1
         kernel.A += Diagonal(indeg)     
     elseif kernel.type == :normalized_laplacian        # computes the Gram matrix on the normalized graph Laplacian
-        @warn "The normalized Laplacian is in beta version."
+        throw("The normalized Laplacian is not iplemented.")
         #D_inv_sqrt = Diagonal(1 ./ sqrt.(sum(kernel.A, dims=2)) .+ 1e-10)   # add small constant to avoid division by zero
         #mul!(kernel.A)  .= I - D_inv_sqrt * A * D_inv_sqrt
     else
@@ -346,15 +358,16 @@ function gram_matrix(A::AbstractMatrix;                  # the adjacency matrix
 
     checksymmetric = issymmetric(A)
     checkunweighted = all(map(x -> x ∈ [0;1], unique(A)))
-    @assert !directed || !checksymmetric "A is not symmetric, but directed is set to false."
+    directed || @assert checksymmetric "A is not symmetric, but directed is set to false."
+
     if checksymmetric
         directed = false
     else
         if symmetrize
-            A += A'
             if checkunweighted
-                A = (A .> 0)
+                A = ((A + A') .> 0) .* 1
             else
+                A += A'
                 A ./= 2
             end 
             directed = false
