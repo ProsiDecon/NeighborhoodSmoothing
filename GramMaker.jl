@@ -171,7 +171,7 @@ end
 
 """
     Computes the singular truncation according to the first k singular values and  
-        returns the inner product (Gram matrix) based on this truncation in column-direction (i.e. A'A).
+        returns the inner product (Gram matrix) based on this truncation in both directions (i.e. (A'A + AA')/2).
 """
 function singular_truncation_both!(M::Matrix, A::Matrix, k::Int)
     N = size(M, 1)
@@ -188,7 +188,7 @@ function singular_truncation_both!(M::Matrix, A::Matrix, k::Int)
     else
         singulars = svds(A, nsv = k)[1]
         lowrank_gram!(M, singulars.U, singulars.S.^2, 2*N)
-        lowrank_gram!(M, singulars.Vt', singulars.S.^2, 2*N, add = true)
+        lowrank_gram!(M, singulars.Vt', singulars.S.^2, 2*N; add = true)
         #M .= singulars.U * Diagonal(singulars.S.^2) * singulars.U' + singulars.Vt' * Diagonal(singulars.S.^2) * singulars.Vt
         #M ./= 2*N
         return M
@@ -198,7 +198,7 @@ end
 
 """
     Computes the singular truncation according to the first k singular values and  
-        returns the inner product (Gram matrix) based on this truncation in column-direction (i.e. A'A).
+        returns the inner product (Gram matrix) based on this truncation in both directions (i.e. (A'A + AA')/2).
 """
 function singular_truncation_both!(M::Matrix, A::Adjoint, k::Int)
     N = size(M, 1)
@@ -215,7 +215,7 @@ function singular_truncation_both!(M::Matrix, A::Adjoint, k::Int)
     else
         singulars = svds(A, nsv = k)[1]
         lowrank_gram!(M, singulars.U, singulars.S.^2, 2*N)
-        lowrank_gram!(M, singulars.Vt', singulars.S.^2, 2*N, add = true)
+        lowrank_gram!(M, singulars.Vt', singulars.S.^2, 2*N; add = true)
         #M .= singulars.U * Diagonal(singulars.S.^2) * singulars.U' + singulars.Vt' * Diagonal(singulars.S.^2) * singulars.Vt
         #M ./= 2*N
         return M
@@ -224,7 +224,7 @@ end
 
 """
     Computes the singular truncation according to the first k singular values and  
-        returns the inner product (Gram matrix) based on this truncation in column-direction (i.e. A'A).
+        returns the inner product (Gram matrix) based on this truncation in both directions (i.e. (A'A + AA')/2).
 """
 function singular_truncation_both!(M::Matrix, A::SparseMatrixCSC, k::Int)
     N = size(M, 1)
@@ -235,7 +235,7 @@ function singular_truncation_both!(M::Matrix, A::SparseMatrixCSC, k::Int)
     else
         singulars = svds(A, nsv = k)[1]
         lowrank_gram!(M, singulars.U, singulars.S.^2, 2*N)
-        lowrank_gram!(M, singulars.Vt', singulars.S.^2, 2*N, add = true)
+        lowrank_gram!(M, singulars.Vt', singulars.S.^2, 2*N; add = true)
         #M .= singulars.U * Diagonal(singulars.S.^2) * singulars.U' + singulars.Vt' * Diagonal(singulars.S.^2) * singulars.Vt
         #M ./= 2*N
         return M
