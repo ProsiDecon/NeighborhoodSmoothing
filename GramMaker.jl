@@ -115,8 +115,8 @@ function singular_truncation!(M::Matrix, A::Matrix, k::Int)
         lowrank_gram!(M, view(U, :, idx), S[idx].^2, N)
         return M
     else
-        U, S, _ = svds(A, nsv = k, which = :LM)
-        M .= U * Diagonal(S.^2) * U'
+        singulars = svds(A, nsv = k)[1]
+        M .= singulars.U * Diagonal(singulars.S.^2) * singulars.U'
         M ./= N
         return M
     end
@@ -138,8 +138,8 @@ function singular_truncation!(M::Matrix, A::Adjoint, k::Int)
         lowrank_gram!(M, view(U, :, idx), S[idx].^2, N)
         return M
     else
-        U, S, _ = svds(A, nsv = k, which = :LM)
-        M .= U * Diagonal(S.^2) * U'
+        singulars = svds(A, nsv = k)[1]
+        M .= singulars.U * Diagonal(singulars.S.^2) * singulars.U'
         M ./= N
         return M
     end
@@ -156,8 +156,8 @@ function singular_truncation!(M::Matrix, A::SparseMatrixCSC, k::Int)
     if k == N
         error("For singular truncation, specify truncation dimension k < N, the matrix dimension.")
     else
-        U, S, _ = svds(A, nsv = k, which = :LM)
-        M .= U * Diagonal(S.^2) * U'
+        singulars = svds(A, nsv = k)[1]
+        M .= singulars.U * Diagonal(singulars.S.^2) * singulars.U'
         M ./= N
         return M
     end
@@ -180,8 +180,8 @@ function singular_truncation_both!(M::Matrix, A::Matrix, k::Int)
         lowrank_gram!(M, view(V, :, idx), S[idx].^2, 2*N; add=true) # add = true adds the object to existing M
         return M
     else
-        U, S, V = svds(A, nsv = k, which = :LM)
-        M .= U * Diagonal(S.^2) * U' + V * Diagonal(S.^2) * V'
+        singulars = svds(A, nsv = k)[1]
+        M .= singulars.U * Diagonal(singulars.S.^2) * singulars.U' + singulars.Vt' * Diagonal(singulars.S.^2) * singulars.Vt
         M ./= 2*N
         return M
     end
@@ -205,8 +205,8 @@ function singular_truncation_both!(M::Matrix, A::Adjoint, k::Int)
         lowrank_gram!(M, view(V, :, idx), S[idx].^2, 2*N; add=true) # add = true adds the object to existing M
         return M
     else
-        U, S, V = svds(A, nsv = k, which = :LM)
-        M .= U * Diagonal(S.^2) * U' + V * Diagonal(S.^2) * V'
+        singulars = svds(A, nsv = k)[1]
+        M .= singulars.U * Diagonal(singulars.S.^2) * singulars.U' + singulars.Vt' * Diagonal(singulars.S.^2) * singulars.Vt
         M ./= 2*N
         return M
     end
@@ -223,8 +223,8 @@ function singular_truncation_both!(M::Matrix, A::SparseMatrixCSC, k::Int)
     if k == N
         error("For singular truncation, specify truncation dimension k < N, the matrix dimension.")
     else
-        U, S, V = svds(A, nsv = k, which = :LM)
-        M .= U * Diagonal(S.^2) * U' + V * Diagonal(S.^2) * V'
+        singulars = svds(A, nsv = k)[1]
+        M .= singulars.U * Diagonal(singulars.S.^2) * singulars.U' + singulars.Vt' * Diagonal(singulars.S.^2) * singulars.Vt
         M ./= 2*N
         return M
     end
@@ -274,19 +274,19 @@ end
 function fit!(kernel::PSDKernel) 
     if kernel.fitted
         @warn "Kernel already fitted. Re-fitting will overwrite the existing gram matrix."
-        kernel .= psdkernel(kernel.A, kernel.type, kernel.k, kernel.directed, kernel.direction)   # re-initialize the gram matrix to identity before re-fitting
     end
 
     # this block stores in the kernel.gram the matrix of choice underlying the kernel
     if kernel.type == :adjacency                    # computes the Gram matrix on the neighborhood directly
         nothing
     elseif kernel.type == :neighborhood_smoothing   # computes the Gram matrix on Zhang, Levina, and Zhu's graphon estimate
-        P_hat = neighborhood_smoothing(kernel.A; directed = kernel.directed, direction = kernel.direction, returndist = false)
-        kernel .= psdkernel(P_hat, kernel.type, kernel.k, kernel.directed, kernel.direction)
+        kernel.direction == :both || @warn "Neighborhood smoothing for both directions not implemented. Graphon will be estimated column-wise."
+        smoothing_direction = ifelse(kernel.direction == :both, :columnwise, kernel.direction)
+        kernel.A = neighborhood_smoothing(kernel.A; directed = kernel.directed, direction = smoothing_direction, returndist = false)
     elseif kernel.type == :laplacian                   # computes the Gram matrix on the unnormalized graph Laplacian
-        indeg = vec(sum(A, dims=2))
+        indeg = vec(sum(kernel.A, dims=2))
         kernel.A .*= -1
-        kernel.A += Diagonal(vec(sum(A, dims=2)))
+        kernel.A += Diagonal(indeg)     
     elseif kernel.type == :normalized_laplacian        # computes the Gram matrix on the normalized graph Laplacian
         @warn "The normalized Laplacian is in beta version."
         #D_inv_sqrt = Diagonal(1 ./ sqrt.(sum(kernel.A, dims=2)) .+ 1e-10)   # add small constant to avoid division by zero
@@ -364,7 +364,7 @@ function gram_matrix(A::AbstractMatrix;                  # the adjacency matrix
 
     # initiate the container 
     gram = psdkernel(A, type, k, directed, direction)
-    fit!(gram, A)   
+    fit!(gram)   
 
     return gram
 end
