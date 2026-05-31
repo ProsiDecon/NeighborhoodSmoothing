@@ -1,6 +1,6 @@
-mutable struct PSDKernel
-    gram::Matrix
-    A::AbstractMatrix
+mutable struct PSDKernel{TA<:AbstractMatrix}
+    gram::Matrix{Float64}
+    A::TA
     type::Symbol
     k::Union{Int, Nothing}
     directed::Bool
@@ -40,7 +40,7 @@ function spectral_truncation!(M::Matrix, A::Matrix, k::Int)
     # compute the top k eigenvalues and eigenvectors of the symmetric matrix M
     N = size(M, 1)
     @assert k <= N "k must be less than or equal to the dimension of the matrix"
-
+    
     if k == N
         error("For spectral truncation, specify truncation dimension k < N, the matrix dimension.")
     elseif k >= .1*N   # for large k, it is more efficient to compute the full eigendecomposition and then truncate
@@ -300,7 +300,7 @@ function fit!(kernel::PSDKernel)
         kernel.A .*= -1
         kernel.A += Diagonal(indeg)     
     elseif kernel.type == :normalized_laplacian        # computes the Gram matrix on the normalized graph Laplacian
-        throw("The normalized Laplacian is not iplemented.")
+        error("The normalized Laplacian is not iplemented.")
         #D_inv_sqrt = Diagonal(1 ./ sqrt.(sum(kernel.A, dims=2)) .+ 1e-10)   # add small constant to avoid division by zero
         #mul!(kernel.A)  .= I - D_inv_sqrt * A * D_inv_sqrt
     else
@@ -357,10 +357,11 @@ function gram_matrix(A::AbstractMatrix;                  # the adjacency matrix
     type in [:adjacency, :neighborhood_smoothing, :laplacian, :normalized_laplacian] || error("type must be one of :adjacency, :neighborhood_smoothing, :laplacian, :normalized_laplacian")
 
     checksymmetric = issymmetric(A)
-    checkunweighted = all(map(x -> x ∈ [0;1], unique(A)))
+    checkunweighted = all(x -> ((x == 0) || (x == 1)), A)
     directed || @assert checksymmetric "A is not symmetric, but directed is set to false."
 
     if checksymmetric
+        @warn "A is symmetric but directed was set true. Now set to false."
         directed = false
     else
         if symmetrize
