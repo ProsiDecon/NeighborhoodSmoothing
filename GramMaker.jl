@@ -17,7 +17,7 @@ function psdkernel(A::AbstractMatrix, type::Symbol, k::Union{Int, Nothing}, dire
 
     gram = Matrix{Float64}(I, N, N)   # allocate the gram matrix as identity 
 
-    return PSDKernel(gram, A, type, k, directed, direction, false)
+    return PSDKernel(gram, copy(A), type, k, directed, direction, false)
 end
 
 ### functions to generate spectral truncation of the kernel matrix
@@ -361,7 +361,7 @@ function gram_matrix(A::AbstractMatrix;                  # the adjacency matrix
     directed || @assert checksymmetric "A is not symmetric, but directed is set to false."
 
     if checksymmetric
-        @warn "A is symmetric but directed was set true. Now set to false."
+        !directed || @warn "A is symmetric but directed was set true. Now set to false."
         directed = false
     else
         if symmetrize
