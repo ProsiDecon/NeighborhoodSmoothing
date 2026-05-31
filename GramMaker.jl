@@ -299,10 +299,16 @@ function fit!(kernel::PSDKernel)
         indeg = vec(sum(kernel.A, dims=2))
         kernel.A .*= -1
         kernel.A += Diagonal(indeg)     
-    elseif kernel.type == :normalized_laplacian        # computes the Gram matrix on the normalized graph Laplacian
-        error("The normalized Laplacian is not iplemented.")
-        #D_inv_sqrt = Diagonal(1 ./ sqrt.(sum(kernel.A, dims=2)) .+ 1e-10)   # add small constant to avoid division by zero
-        #mul!(kernel.A)  .= I - D_inv_sqrt * A * D_inv_sqrt
+    elseif kernel.type == :normalized_laplacian        # computes the Gram matrix on the normalized graph Laplacian, 
+        # this implementation uses L_rw = I - D^{-1} A  due to the arguments in von Luxburg 2007 A Tutorial on Spectral Clustering
+        !kernel.directed || @warn "The normalised Graph Laplacian on a directed graph may yield problematic results if nodes without in-degree have outward-connections."
+        indeg = (vec(sum(kernel.A, dims=2)) .+ eps()).^(-1)
+        N = length(indeg)
+        if kernel.A isa SparseMatrixCSC
+            kernel.A = sparse(I,N,N) - Diagonal(indeg) * kernel.A
+        else
+            kernel.A = Matrix(I,N,N) - kernel.A .* indeg
+        end
     else
         error("type must be one of :adjacency, :neighborhood_smoothing, :laplacian, :normalized_laplacian")
     end
