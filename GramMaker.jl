@@ -296,12 +296,18 @@ function fit!(kernel::PSDKernel)
         smoothing_direction = ifelse(kernel.direction == :both, :columnwise, kernel.direction)
         kernel.A = neighborhood_smoothing(kernel.A; directed = kernel.directed, direction = smoothing_direction, returndist = false)
     elseif kernel.type == :laplacian                   # computes the Gram matrix on the unnormalized graph Laplacian
-        indeg = vec(sum(kernel.A, dims=2))
+        # for the directed case, we can initiate two Laplacians. For exposure to upstream flows, we should consider the Laplacian
+        # placing outdegrees on the main diagonal and only conduct column-wise operations, see differences to Peebles' definition https://www.youtube.com/watch?v=3j3IRXdrzEU&t=129s
+        !kernel.directed || @warn "The Graph Laplacian on a directed graph may yield problematic results. Consider setting symmetrize = true. "
+        !kernel.directed || kernel.direction == :columnwise || @warn "The Graph Laplacian in the directed case is defined as D_out - A. Use column-wise operations only."
+        outdeg = vec(sum(kernel.A, dims=1))
         kernel.A .*= -1
         kernel.A += Diagonal(indeg)     
     elseif kernel.type == :normalized_laplacian        # computes the Gram matrix on the normalized graph Laplacian, 
         # this implementation uses L_rw = I - D^{-1} A  due to the arguments in von Luxburg 2007 A Tutorial on Spectral Clustering
-        !kernel.directed || @warn "The normalised Graph Laplacian on a directed graph may yield problematic results if nodes without in-degree have outward-connections."
+        # Newman (chapter 6.14) states that the Graph Laplacian is not really applicable to directed networks
+        !kernel.directed || @warn "The normalised Graph Laplacian on a directed graph may yield problematic results. Consider setting symmetrize = true."
+        !kernel.directed || kernel.direction == :columnwise || @warn "The Graph Laplacian in the directed case is defined as D_out - A. Use column-wise operations only."
         indeg = (vec(sum(kernel.A, dims=2)) .+ eps()).^(-1)
         N = length(indeg)
         if kernel.A isa SparseMatrixCSC
