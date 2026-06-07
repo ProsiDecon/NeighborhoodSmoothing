@@ -3,7 +3,7 @@ mutable struct PSDKernel{TA<:AbstractMatrix}
     A::TA
     type::Symbol
     k::Union{Int, Nothing}
-    t::Union{Float, Nothing}
+    t::Union{Real, Nothing}
     directed::Bool
     direction::Symbol
     fitted::Bool
@@ -12,7 +12,7 @@ end
 """
     Initialize a PSDKernel object with the instructions for kernel computation
 """
-function psdkernel(A::AbstractMatrix, type::Symbol, k::Union{Int, Nothing}, t::Union{Float, Nothing}, directed::Bool, direction::Symbol)
+function psdkernel(A::AbstractMatrix, type::Symbol, k::Union{Int, Nothing}, t::Union{Real, Nothing}, directed::Bool, direction::Symbol)
     N = size(A, 1)
     @assert size(A, 1) == size(A, 2) "A must be a square matrix"
 
@@ -373,7 +373,7 @@ end
 function gram_matrix(A::AbstractMatrix;                  # the adjacency matrix
                     type::Symbol = :adjacency,          # the type of Kernel for which we compute the Gram matrix
                     k::Union{Int, Nothing} = nothing,   # the number of principal components of which to return the gram matrix (if nothing, use the full information)
-                    t::Union{Float, Nothing} = nothing, # the time parameter for the heat diffusion kernel
+                    t::Union{Real, Nothing} = nothing, # the time parameter for the heat diffusion kernel
                     directed::Bool = false,             # whether the graph is intended to be directed
                     symmetrize::Bool = true,            # for directed graphs, whether to compute the gram matrix of the symmetric graph (true) or whether to use the directed graph
                     direction::Symbol = :columnwise)    # if !symmetrize, the direction of the kernel (forward = :rowwise, backward = :columnwise, computing both and using their average = :both)
