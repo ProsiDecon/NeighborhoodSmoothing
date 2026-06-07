@@ -15,6 +15,7 @@ end
 function psdkernel(A::AbstractMatrix, type::Symbol, k::Union{Int, Nothing}, t::Union{Real, Nothing}, directed::Bool, direction::Symbol)
     N = size(A, 1)
     @assert size(A, 1) == size(A, 2) "A must be a square matrix"
+    isnothing(t) || (t > 0) || error("t must be a positive real number for the heat diffusion kernel.")
 
     gram = Matrix{Float64}(I, N, N)   # allocate the gram matrix as identity 
 
