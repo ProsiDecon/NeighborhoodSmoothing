@@ -316,12 +316,15 @@ function fit!(kernel::PSDKernel)
         # Newman (chapter 6.14) states that the Graph Laplacian is not really applicable to directed networks
         !kernel.directed || @warn "The normalised Graph Laplacian on a directed graph may not be positive semi-definite. Consider setting symmetrize = true. Continuing will compute a gram matrix on the directed Laplacian and not a heat diffusion kernel."
         !kernel.directed || kernel.direction == :columnwise || @warn "The Graph Laplacian in the directed case is defined as D_out - A. Use column-wise operations only."
-        outdeg = (vec(sum(kernel.A, dims=1)) .+ eps()).^(-1)
+        #outdeg = (vec(sum(kernel.A, dims=1)) .+ eps()).^(-1)
+        outdeg = (vec(sum(kernel.A, dims=1)) .+ eps()).^(-.5)
         N = length(outdeg)
         if kernel.A isa SparseMatrixCSC
-            kernel.A = sparse(I,N,N) - Diagonal(outdeg) * kernel.A
+            #kernel.A = sparse(I,N,N) - Diagonal(outdeg) * kernel.A
+            kernel.A = sparse(I,N,N) - Diagonal(outdeg) * kernel.A * Diagonal(outdeg)
         else
-            kernel.A = Matrix(I,N,N) - kernel.A .* outdeg
+            #kernel.A = Matrix(I,N,N) - kernel.A .* outdeg
+            kernel.A = Matrix(I,N,N) - kernel.A .* outdeg .* outdeg'
         end
     else
         error("type must be one of :adjacency, :neighborhood_smoothing, :laplacian, :normalized_laplacian")
