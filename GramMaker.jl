@@ -3,6 +3,7 @@ mutable struct PSDKernel{TA<:AbstractMatrix}
     A::TA
     type::Symbol
     k::Union{Int, Nothing}
+    t::Union{Float, Nothing}
     directed::Bool
     direction::Symbol
     fitted::Bool
@@ -11,13 +12,13 @@ end
 """
     Initialize a PSDKernel object with the instructions for kernel computation
 """
-function psdkernel(A::AbstractMatrix, type::Symbol, k::Union{Int, Nothing}, directed::Bool, direction::Symbol)
+function psdkernel(A::AbstractMatrix, type::Symbol, k::Union{Int, Nothing}, t::Union{Float, Nothing}, directed::Bool, direction::Symbol)
     N = size(A, 1)
     @assert size(A, 1) == size(A, 2) "A must be a square matrix"
 
     gram = Matrix{Float64}(I, N, N)   # allocate the gram matrix as identity 
 
-    return PSDKernel(gram, copy(A), type, k, directed, direction, false)
+    return PSDKernel(gram, copy(A), type, k, t, directed, direction, false)
 end
 
 ### functions to generate spectral truncation of the kernel matrix
@@ -253,7 +254,14 @@ function fit_initialised!(kernel::PSDKernel)
         kernel.k = nothing
     end
 
-    if (typeof(kernel.k) <:Int) && (kernel.k < N)
+    if kernel.type in [:laplacian, :normalized_laplacian] && issymmetric(kernel.A)  # compute the heat kernel
+        @assert !isnothing(kernel.t) "For the heat diffusion kernel, specify a diffusion parameter t > 0."
+        if typeof(kernel.A) <: SparseMatrixCSC
+            kernel.gram .= exp(-kernel.t .* Matrix(kernel.A))  
+        elseif typeof(kernel.A) <: Matrix
+            kernel.gram .= exp(-kernel.t .* kernel.A)  
+        end
+    elseif (typeof(kernel.k) <:Int) && (kernel.k < N)
         if !kernel.directed
             spectral_truncation!(kernel.gram, kernel.A, kernel.k)
         elseif kernel.direction == :columnwise
@@ -298,22 +306,22 @@ function fit!(kernel::PSDKernel)
     elseif kernel.type == :laplacian                   # computes the Gram matrix on the unnormalized graph Laplacian
         # for the directed case, we can initiate two Laplacians. For exposure to upstream flows, we should consider the Laplacian
         # placing outdegrees on the main diagonal and only conduct column-wise operations, see differences to Peebles' definition https://www.youtube.com/watch?v=3j3IRXdrzEU&t=129s
-        !kernel.directed || @warn "The Graph Laplacian on a directed graph may yield problematic results. Consider setting symmetrize = true. "
+        !kernel.directed || @warn "The Graph Laplacian on a directed graph may not be positive semi-definite. Consider setting symmetrize = true. Continuing will compute a gram matrix on the directed Laplacian and not a heat diffusion kernel."
         !kernel.directed || kernel.direction == :columnwise || @warn "The Graph Laplacian in the directed case is defined as D_out - A. Use column-wise operations only."
         outdeg = vec(sum(kernel.A, dims=1))
         kernel.A .*= -1
-        kernel.A += Diagonal(indeg)     
+        kernel.A += Diagonal(outdeg) 
     elseif kernel.type == :normalized_laplacian        # computes the Gram matrix on the normalized graph Laplacian, 
         # this implementation uses L_rw = I - D^{-1} A  due to the arguments in von Luxburg 2007 A Tutorial on Spectral Clustering
         # Newman (chapter 6.14) states that the Graph Laplacian is not really applicable to directed networks
-        !kernel.directed || @warn "The normalised Graph Laplacian on a directed graph may yield problematic results. Consider setting symmetrize = true."
+        !kernel.directed || @warn "The normalised Graph Laplacian on a directed graph may not be positive semi-definite. Consider setting symmetrize = true. Continuing will compute a gram matrix on the directed Laplacian and not a heat diffusion kernel."
         !kernel.directed || kernel.direction == :columnwise || @warn "The Graph Laplacian in the directed case is defined as D_out - A. Use column-wise operations only."
-        indeg = (vec(sum(kernel.A, dims=2)) .+ eps()).^(-1)
-        N = length(indeg)
+        outdeg = (vec(sum(kernel.A, dims=1)) .+ eps()).^(-1)
+        N = length(outdeg)
         if kernel.A isa SparseMatrixCSC
-            kernel.A = sparse(I,N,N) - Diagonal(indeg) * kernel.A
+            kernel.A = sparse(I,N,N) - Diagonal(outdeg) * kernel.A
         else
-            kernel.A = Matrix(I,N,N) - kernel.A .* indeg
+            kernel.A = Matrix(I,N,N) - kernel.A .* outdeg
         end
     else
         error("type must be one of :adjacency, :neighborhood_smoothing, :laplacian, :normalized_laplacian")
@@ -362,11 +370,18 @@ end
 function gram_matrix(A::AbstractMatrix;                  # the adjacency matrix
                     type::Symbol = :adjacency,          # the type of Kernel for which we compute the Gram matrix
                     k::Union{Int, Nothing} = nothing,   # the number of principal components of which to return the gram matrix (if nothing, use the full information)
+                    t::Union{Float, Nothing} = nothing, # the time parameter for the heat diffusion kernel
                     directed::Bool = false,             # whether the graph is intended to be directed
                     symmetrize::Bool = true,            # for directed graphs, whether to compute the gram matrix of the symmetric graph (true) or whether to use the directed graph
                     direction::Symbol = :columnwise)    # if !symmetrize, the direction of the kernel (forward = :rowwise, backward = :columnwise, computing both and using their average = :both)
     
     type in [:adjacency, :neighborhood_smoothing, :laplacian, :normalized_laplacian] || error("type must be one of :adjacency, :neighborhood_smoothing, :laplacian, :normalized_laplacian")
+
+    if type in [:laplacian, :normalized_laplacian] 
+        !isnothing(t) || error("For the heat diffusion kernel, specify a diffusion parameter t > 0.")
+    else
+        t = nothing
+    end
 
     checksymmetric = issymmetric(A)
     checkunweighted = all(x -> ((x == 0) || (x == 1)), A)
@@ -389,7 +404,7 @@ function gram_matrix(A::AbstractMatrix;                  # the adjacency matrix
     end
 
     # initiate the container 
-    gram = psdkernel(A, type, k, directed, direction)
+    gram = psdkernel(A, type, k, t, directed, direction)
     fit!(gram)   
 
     return gram
